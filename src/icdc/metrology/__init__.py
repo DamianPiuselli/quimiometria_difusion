@@ -8,6 +8,13 @@ from icdc.metrology.metrics import (
     calc_horrat,
     MetrologicalReport,
 )
+from icdc.metrology.detection_limits import (
+    DetectionLimitsResult,
+    calc_negative_bound_rate,
+    calc_exceedance_probability,
+    compute_linear_decision_limits,
+    compute_posterior_decision_limits,
+)
 
 __all__ = [
     "calc_rmsep",
@@ -18,4 +25,9 @@ __all__ = [
     "horwitz_sd",
     "calc_horrat",
     "MetrologicalReport",
+    "DetectionLimitsResult",
+    "calc_negative_bound_rate",
+    "calc_exceedance_probability",
+    "compute_linear_decision_limits",
+    "compute_posterior_decision_limits",
 ]

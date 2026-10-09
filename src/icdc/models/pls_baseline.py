@@ -2,6 +2,7 @@
 
 from typing import Optional, Tuple
 import numpy as np
+from scipy.signal import savgol_filter
 from sklearn.cross_decomposition import PLSRegression
 from sklearn.model_selection import KFold
 
@@ -17,6 +18,7 @@ def apply_snv(x: np.ndarray) -> np.ndarray:
 class PLSBaseline:
     """Partial Least Squares (PLS) Regressor with automated LV selection via CV.
 
+    Supports native chemometric preprocessing: Savitzky-Golay filtering/derivatives and SNV.
     Provides point predictions and classical parametric confidence intervals
     based on residual standard error (for GUM comparison).
     """
@@ -25,25 +27,43 @@ class PLSBaseline:
         self,
         max_components: int = 15,
         use_snv: bool = True,
+        savgol_window: Optional[int] = None,
+        savgol_poly: int = 2,
+        savgol_deriv: int = 0,
         cv_folds: int = 5,
         random_state: int = 42,
     ):
         self.max_components = max_components
         self.use_snv = use_snv
+        self.savgol_window = savgol_window
+        self.savgol_poly = savgol_poly
+        self.savgol_deriv = savgol_deriv
         self.cv_folds = cv_folds
         self.random_state = random_state
         self.best_n_components: Optional[int] = None
         self.model: Optional[PLSRegression] = None
         self.residual_variance: Optional[float] = None
 
+    def preprocess(self, x: np.ndarray) -> np.ndarray:
+        """Apply configured chemometric preprocessing (Savitzky-Golay and/or SNV)."""
+        x_proc = np.asarray(x, dtype=np.float64).copy()
+        if self.savgol_window is not None and self.savgol_window > 2:
+            # Window length must be odd and <= number of channels
+            w = self.savgol_window if self.savgol_window % 2 == 1 else self.savgol_window + 1
+            w = min(w, x_proc.shape[-1] if x_proc.shape[-1] % 2 == 1 else x_proc.shape[-1] - 1)
+            if w > self.savgol_poly:
+                x_proc = savgol_filter(x_proc, window_length=w, polyorder=self.savgol_poly, deriv=self.savgol_deriv, axis=-1)
+
+        if self.use_snv:
+            x_proc = apply_snv(x_proc)
+
+        return x_proc
+
     def fit(self, x: np.ndarray, y: np.ndarray) -> "PLSBaseline":
         x = np.asarray(x, dtype=np.float64)
         y = np.asarray(y, dtype=np.float64).reshape(-1, 1)
 
-        if self.use_snv:
-            x_proc = apply_snv(x)
-        else:
-            x_proc = x
+        x_proc = self.preprocess(x)
 
         n_samples = x.shape[0]
         max_lv = min(self.max_components, n_samples - 2, x.shape[1])
@@ -82,9 +102,8 @@ class PLSBaseline:
         if self.model is None:
             raise RuntimeError("Model has not been fitted.")
         x = np.asarray(x, dtype=np.float64)
-        if self.use_snv:
-            x = apply_snv(x)
-        return self.model.predict(x).ravel()
+        x_proc = self.preprocess(x)
+        return self.model.predict(x_proc).ravel()
 
     def predict_intervals(
         self, x: np.ndarray, coverage: float = 0.95

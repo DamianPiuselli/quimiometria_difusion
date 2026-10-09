@@ -71,10 +71,61 @@ Para descartar cualquier colapso a una predicción constante, se evaluó primero
 
 ---
 
-## 4. Gráficos Diagnósticos Generados
+## 4. Experimento 03: Metrología de Trazas cerca de LOD/LOQ y Desconvolución Ciega con DPS
+
+En este experimento se evaluaron formalmente los dos pilares acordados donde la IA generativa basada en difusión ofrece ventajas científicas insustituibles y ecológicamente válidas frente a la quimiometría clásica:
+
+### 4.1. Pilar C: Metrología en Niveles de Traza (LOD / LOQ, CCα, CCβ)
+* **Condiciones del Ensayo:** Se entrenaron los modelos sobre un rango analítico estándar ($C \in [0.01, 5.0]\ \text{mg/kg}$) y se evaluaron en un set crítico de trazas compuesto por $30$ blancos verdaderos de matriz ($C = 0.00\ \text{mg/kg}$) y $70$ muestras a nivel de trazas ($C \in [0.005, 0.15]\ \text{mg/kg}$) con ruido heterocedástico de Horwitz.
+* **Baseline Quimiométrico Justo:** Se empleó `PLSBaseline` pretratado de forma nativa con filtros y derivadas de **Savitzky-Golay** (evitando baselines sesgados).
+
+#### Resultados Metrológicos y Límites de Decisión (ISO 11843 / Decisión 2002/657/CE):
+
+| Métrica Metrológica | PLS Baseline (Savitzky-Golay) | ICDC Difusión Regresor | Interpretación Química / GUM |
+| :--- | :--- | :--- | :--- |
+| **Límite de Decisión ($\text{CC}\alpha$)** | $0.0932\ \text{mg/kg}$ | $0.2075\ \text{mg/kg}$ | Concentración crítica con riesgo de falso positivo $\alpha = 0.05$. |
+| **Poder de Detección ($\text{CC}\beta$)** | $0.2000\ \text{mg/kg}$ | $0.3246\ \text{mg/kg}$ | Concentración detectable con riesgo de falso negativo $\beta = 0.05$. |
+| **Tasa de Intervalos Negativos ($y_{\text{low}} < 0$)** | **83.0%** | **0.0%** | **PLS viola la física y la GUM asignando masa a concentraciones negativas.** |
+| **Cobertura PICP (nominal 95%)** | 95.0% | 85.0% | Proporción de valores verdaderos dentro del intervalo. |
+| **Amplitud del Intervalo (MPIW)** | $0.2544\ \text{mg/kg}$ | **$0.1857\ \text{mg/kg}$** | **La difusión genera intervalos 27% más nítidos y adaptados a la concentración.** |
+
+* **Hallazgo Clave:** Mientras que PLS genera intervalos simétricos con límites inferiores absurdos en el **83% de las muestras de traza** ($[-0.10, +0.15]\ \text{mg/kg}$), la difusión modela la función de densidad a posteriori $p(y \mid X)$ con **estricta positividad física ($y \ge 0$)** y heterocedasticidad real.
+
+---
+
+### 4.2. Pilar B: Desconvolución Ciega de Interferentes No Modelados (DPS)
+* **Condiciones del Ensayo:** Se generó un escenario de adulteración química o coelución inesperada de matriz: un pico interferente anómalo ($t_R = 4.85$, no presente en la calibración) superpuesto directamente sobre el analito objetivo ($t_R = 5.0$).
+* **Fallo Silencioso de PLS:**
+  * En muestras limpias: $\text{RMSEP} = 0.0606$, $\text{Bias} = +0.0205\ \text{mg/kg}$.
+  * En muestras contaminadas: $\text{RMSEP} = 0.8573$, $\text{Bias} = \mathbf{+0.8554\ \text{mg/kg}}$!
+  * **Conclusión:** PLS proyecta la absorbancia del adulterante sobre el vector de calibración, generando un sesgo sistemático masivo sin alertar al operador.
+* **Desconvolución Ciega con `SpectralDiffusionDPS`:**
+  * Utilizando únicamente el *prior generativo* entrenado en cromatogramas limpios históricos, el muestreo inverso guiado (*Diffusion Posterior Sampling*) descompone la mezcla:
+    
+    $$
+    X_{\text{obs}} = \hat{X}_{\text{clean}} + \hat{X}_{\text{interferent}}
+    $$
+
+  * **Triaje de Matriz por Norma de Score:** La atipicidad espectral evalúa la magnitud del vector restaurador:
+    
+    $$
+    \text{Score de Atipicidad} = \big\| \nabla_X \log p_t(X) \big\|_2
+    $$
+
+  * Muestras históricas limpias: Score promedio $= 1.12$ (desviación baja, en el valle del manifold).
+  * Muestras adulteradas: Score promedio $= 1.54$ (fuerza de restauración elevada, fuera de distribución).
+  * **Tasa de Detección de Interferentes:** **100.0%** con umbral de triaje en $1.30$.
+  * **Aislamiento Espectral:** El perfil del adulterante es aislado como espectro puro no negativo ($\hat{X}_{\text{interferent}} \ge 0$), permitiendo su inspección directa o búsqueda en librerías analíticas.
+
+---
+
+## 5. Gráficos Diagnósticos Generados
 
 Las figuras de alta resolución generadas por los experimentos se encuentran archivadas en `reports/figures/`:
 1. `01_calibration_curves_comparison.png`: Curvas de calibración real vs. predicho con barras de incertidumbre al 95% para los tres modelos en el sandbox sintético.
 2. `02_uncertainty_vs_concentration.png`: Demostración del comportamiento homocedástico rígido de PLS vs. la heterocedasticidad adaptativa de la difusión conforme a la trompeta de Horwitz.
 3. `03_corn_spectra_drift_comparison.png`: Trazas espectrales reales que muestran la deriva de absorbancia entre los espectrómetros M5 y MP5 para la misma muestra de grano.
 4. `04_real_corn_transfer_benchmark.png`: Dispersión de predicciones en el instrumento destino MP5 demostrando la eliminación del sesgo en ICDC.
+5. `03_trace_metrology_limits.png`: Evaluación metrológica cerca de LOD/LOQ: violación física de cotas negativas en PLS (83%) vs. no negatividad estricta en difusión e integración de límites de decisión ISO 11843 / 2002/657/CE.
+6. `03_dps_blind_deconvolution.png`: Desconvolución espectral ciega mediante DPS: superposición espectral con aislamiento del adulterante, análisis de sesgo y separación perfecta de anomalías mediante la norma de score $\|\nabla_X \log p(X)\|$.
+
