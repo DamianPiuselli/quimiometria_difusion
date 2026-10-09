@@ -8,6 +8,7 @@ authors = [
 ]
 requires-python = ">=3.12"
 dependencies = [
+    "ipykernel>=7.4.0",
     "matplotlib>=3.11.2",
     "numpy>=2.5.3",
     "pandas>=3.0.6",
@@ -23,5 +24,7 @@ build-backend = "uv_build"
 
 [dependency-groups]
 dev = [
+    "nbclient>=0.11.0",
+    "nbformat>=5.11.1",
     "pytest>=9.1.1",
 ]
