@@ -2,29 +2,27 @@
 
 from typing import Optional, Tuple
 import numpy as np
+from sklearn.preprocessing import StandardScaler
 import torch
 import torch.nn as nn
 from torch.utils.data import TensorDataset, DataLoader
 
 
 class Conv1DBackbone(nn.Module):
-    """1D-CNN Backbone for spectral feature extraction."""
+    """1D-CNN Backbone for spectral feature extraction with regional pooling."""
 
     def __init__(self, in_channels: int = 1, feature_dim: int = 64):
         super().__init__()
         self.conv_net = nn.Sequential(
-            nn.Conv1d(in_channels, 32, kernel_size=7, stride=2, padding=3),
+            nn.Conv1d(in_channels, 32, kernel_size=11, stride=2, padding=5),
             nn.GroupNorm(4, 32),
             nn.GELU(),
-            nn.Conv1d(32, 64, kernel_size=5, stride=2, padding=2),
+            nn.Conv1d(32, 64, kernel_size=7, stride=2, padding=3),
             nn.GroupNorm(8, 64),
             nn.GELU(),
-            nn.Conv1d(64, 128, kernel_size=3, stride=2, padding=1),
-            nn.GroupNorm(16, 128),
-            nn.GELU(),
-            nn.AdaptiveAvgPool1d(1),
+            nn.AdaptiveAvgPool1d(8),  # Preserves 8 localized regional spectral windows
             nn.Flatten(),
-            nn.Linear(128, feature_dim),
+            nn.Linear(64 * 8, feature_dim),
             nn.GELU(),
         )
 
@@ -52,7 +50,7 @@ class CNN1DRegressorNet(nn.Module):
 
 
 class CNN1DBaseline:
-    """Scikit-learn style wrapper for the 1D-CNN Regressor."""
+    """Scikit-learn style wrapper for the 1D-CNN Regressor with input standardization."""
 
     def __init__(
         self,
@@ -61,6 +59,7 @@ class CNN1DBaseline:
         weight_decay: float = 1e-4,
         epochs: int = 100,
         batch_size: int = 32,
+        standardize_x: bool = True,
         device: Optional[str] = None,
         random_state: int = 42,
     ):
@@ -69,7 +68,10 @@ class CNN1DBaseline:
         self.weight_decay = weight_decay
         self.epochs = epochs
         self.batch_size = batch_size
+        self.standardize_x = standardize_x
         self.random_state = random_state
+
+        self.scaler: Optional[StandardScaler] = StandardScaler() if standardize_x else None
 
         if device is None:
             self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -88,11 +90,16 @@ class CNN1DBaseline:
         x = np.asarray(x, dtype=np.float32)
         y = np.asarray(y, dtype=np.float32).ravel()
 
+        if self.standardize_x and self.scaler is not None:
+            x_proc = self.scaler.fit_transform(x)
+        else:
+            x_proc = x
+
         self.y_mean = float(np.mean(y))
         self.y_std = float(np.std(y)) if np.std(y) > 0 else 1.0
         y_norm = (y - self.y_mean) / self.y_std
 
-        dataset = TensorDataset(torch.from_numpy(x), torch.from_numpy(y_norm).unsqueeze(1))
+        dataset = TensorDataset(torch.from_numpy(x_proc), torch.from_numpy(y_norm).unsqueeze(1))
         loader = DataLoader(dataset, batch_size=self.batch_size, shuffle=True)
 
         self.net = CNN1DRegressorNet(feature_dim=self.feature_dim).to(self.device)
@@ -122,8 +129,14 @@ class CNN1DBaseline:
         if self.net is None:
             raise RuntimeError("Model has not been fitted.")
 
+        x = np.asarray(x, dtype=np.float32)
+        if self.standardize_x and self.scaler is not None:
+            x_proc = self.scaler.transform(x)
+        else:
+            x_proc = x
+
         self.net.eval()
-        x_t = torch.from_numpy(np.asarray(x, dtype=np.float32)).to(self.device)
+        x_t = torch.from_numpy(x_proc).to(self.device)
         with torch.no_grad():
             preds_norm = self.net(x_t).cpu().numpy().ravel()
         return (preds_norm * self.y_std) + self.y_mean
@@ -131,7 +144,6 @@ class CNN1DBaseline:
     def predict_intervals(
         self, x: np.ndarray, coverage: float = 0.95
     ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
-        """Predict with homoscedastic residual error intervals (standard deep learning baseline)."""
         from scipy import stats
 
         y_pred = self.predict(x)

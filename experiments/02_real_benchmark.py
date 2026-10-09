@@ -1,14 +1,14 @@
 """Experiment 02: Real-World Benchmark on the Corn NIR Dataset.
 
-Tests Cross-Instrument Calibration Transfer:
-- Source Instrument: FOSS NIRSystems M5
-- Target Instrument: FOSS NIRSystems MP5
-- Target: Chemical content (Moisture / Matrix composition)
+Tests Cross-Instrument Calibration Transfer and In-Domain Performance:
+- Source Instrument: FOSS NIRSystems M5 (Train N=50)
+- Target Instrument: FOSS NIRSystems MP5 (Test N=20)
+- Transfer Context: N=10 standards from MP5
 
 Compares:
-1. PLS Baseline (Direct transfer without adaptation vs. Retrained)
-2. 1D-CNN Baseline (Direct transfer)
-3. ICDC Diffusion (In-Context Calibration with transfer standards)
+1. In-Domain Performance (M5 -> M5): Proof that models accurately learn without constant collapse.
+2. Cross-Instrument Direct Transfer (M5 -> MP5): PLS and 1D-CNN suffering instrument bias.
+3. ICDC Diffusion (In-Context Calibration): Transfer adaptation using MP5 standards.
 """
 
 from pathlib import Path
@@ -36,9 +36,9 @@ def run_real_benchmark(
     output_dir: str = "reports/figures",
     random_state: int = 42,
 ):
-    print("=" * 70)
+    print("=" * 75)
     print("  EXPERIMENT 02: REAL BENCHMARK (CORN NIR M5 -> MP5 CALIBRATION TRANSFER)")
-    print("=" * 70)
+    print("=" * 75)
 
     out_path = Path(output_dir)
     out_path.mkdir(parents=True, exist_ok=True)
@@ -62,47 +62,60 @@ def run_real_benchmark(
     x_tgt_test = splits["X_target_test"]
     y_tgt_test = splits["y_target_test"]
 
+    # In-domain test set on M5
+    x_src_test = corn_data["X_m5"][splits["test_idx"]]
+
     n_test = len(y_tgt_test)
     print(f"  --> Source Training (M5): {len(x_src_train)} samples, {x_src_train.shape[1]} wavelengths.")
     print(f"  --> Transfer Context (MP5): {len(x_tgt_transfer)} standards.")
     print(f"  --> Target Test (MP5): {n_test} unknown samples.")
+    print(f"  --> Target Y: Mean={np.mean(y_tgt_test):.3f}, Std={np.std(y_tgt_test):.3f}, Range=[{y_tgt_test.min():.2f}, {y_tgt_test.max():.2f}]")
 
     # 2. Train Models on Source Instrument (M5)
     print("\n[2/4] Training Models on Source Instrument (M5)...")
 
-    # A. PLS Direct Transfer
+    # A. PLS
     print("  --> Fitting PLS on M5 (with cross-validation)...")
-    pls_direct = PLSBaseline(max_components=12, use_snv=True, random_state=random_state)
-    pls_direct.fit(x_src_train, y_src_train)
-    print(f"      Selected Latent Variables: {pls_direct.best_n_components}")
+    pls = PLSBaseline(max_components=10, use_snv=False, random_state=random_state)
+    pls.fit(x_src_train, y_src_train)
+    print(f"      Selected Latent Variables: {pls.best_n_components}")
 
-    # B. 1D-CNN
-    print("  --> Training 1D-CNN on M5 (70 epochs)...")
-    cnn = CNN1DBaseline(feature_dim=32, lr=1e-3, epochs=70, batch_size=16, random_state=random_state)
+    # B. 1D-CNN (with localized pooling & standardization)
+    print("  --> Training 1D-CNN on M5 (100 epochs)...")
+    cnn = CNN1DBaseline(feature_dim=32, lr=1e-3, epochs=100, batch_size=16, standardize_x=True, random_state=random_state)
     cnn.fit(x_src_train, y_src_train)
 
-    # C. ICDC Diffusion (with In-Context daily context vector)
-    print("  --> Training ICDC Diffusion Model on M5 (80 epochs)...")
-    # For training on M5, the source context is the mean profile of M5 standards
-    c_m5_proto = np.mean(x_src_train[:n_transfer_standards], axis=0, keepdims=True)
-    c_m5_ctx = np.repeat(c_m5_proto[:, :16], len(x_src_train), axis=0)
-
+    # C. ICDC Diffusion (with CARD anti-collapse anchor and In-Context context)
+    print("  --> Training ICDC Diffusion Model on M5 (120 epochs)...")
     diffusion = DiffusionRegressor(
         spectral_dim=32,
-        context_dim=16,
+        context_dim=1,
         timesteps=50,
         lr=1e-3,
-        epochs=80,
+        epochs=120,
         batch_size=16,
+        standardize_x=True,
+        use_anchor=True,
         random_state=random_state,
     )
-    diffusion.fit(x_src_train, y_src_train, c_day=c_m5_ctx)
+    c_m5_ctx = np.zeros((len(x_src_train), 1), dtype=np.float32)
+    diffusion.fit(x_src_train, y_src_train, c_day=c_m5_ctx, augment_transfer_shift=True)
 
-    # 3. Predict on Target Instrument (MP5)
-    print("\n[3/4] Evaluating Transfer Performance on Target Instrument (MP5)...")
+    # 3. In-Domain Verification (M5 -> M5)
+    print("\n[3/5] In-Domain Verification (M5 -> M5) to rule out constant collapse:")
+    pred_in_pls = pls.predict(x_src_test)
+    pred_in_cnn = cnn.predict(x_src_test)
+    pred_in_diff = diffusion.predict(x_src_test, n_samples=30, c_day=np.zeros((n_test, 1)))
+
+    print(f"  * PLS (M5 -> M5):      R2 = {calc_r2(y_tgt_test, pred_in_pls):.4f} | RMSEP = {calc_rmsep(y_tgt_test, pred_in_pls):.4f} | Range = [{pred_in_pls.min():.2f}, {pred_in_pls.max():.2f}]")
+    print(f"  * 1D-CNN (M5 -> M5):   R2 = {calc_r2(y_tgt_test, pred_in_cnn):.4f} | RMSEP = {calc_rmsep(y_tgt_test, pred_in_cnn):.4f} | Range = [{pred_in_cnn.min():.2f}, {pred_in_cnn.max():.2f}]")
+    print(f"  * Diffusion (M5 -> M5): R2 = {calc_r2(y_tgt_test, pred_in_diff):.4f} | RMSEP = {calc_rmsep(y_tgt_test, pred_in_diff):.4f} | Range = [{pred_in_diff.min():.2f}, {pred_in_diff.max():.2f}]")
+
+    # 4. Cross-Instrument Transfer (M5 -> MP5)
+    print("\n[4/5] Evaluating Cross-Instrument Transfer on MP5...")
 
     # PLS Direct (without transfer)
-    y_pred_pls, pls_low, pls_up = pls_direct.predict_intervals(x_tgt_test, coverage=0.95)
+    y_pred_pls, pls_low, pls_up = pls.predict_intervals(x_tgt_test, coverage=0.95)
     pls_rep = MetrologicalReport(
         model_name="PLS (M5 -> MP5 Direct)",
         n_samples=n_test,
@@ -127,13 +140,16 @@ def run_real_benchmark(
         non_negative_fraction=float(np.mean(cnn_low >= 0.0)),
     )
 
-    # ICDC Diffusion (conditioned on the MP5 transfer standards context)
+    # ICDC Diffusion (In-Context Calibration with MP5 transfer standards)
     print("  --> In-Context Diffusion Sampling on MP5 (Monte Carlo N=60)...")
-    c_mp5_proto = np.mean(x_tgt_transfer, axis=0, keepdims=True)
-    c_mp5_ctx = np.repeat(c_mp5_proto[:, :16], n_test, axis=0)
+    # Estimate the transfer bias from the 10 MP5 transfer standards
+    x_transfer_proc = diffusion.scaler.transform(x_tgt_transfer) if diffusion.scaler is not None else x_tgt_transfer
+    pred_transfer_anchor = diffusion.anchor_model.predict(x_transfer_proc)
+    c_transfer_bias = float(np.mean(pred_transfer_anchor - y_tgt_transfer)) / diffusion.y_std
+    c_day_mp5 = np.full((n_test, 1), c_transfer_bias, dtype=np.float32)
 
     y_pred_diff, diff_low, diff_up = diffusion.predict_intervals(
-        x_tgt_test, coverage=0.95, n_samples=60, c_day=c_mp5_ctx
+        x_tgt_test, coverage=0.95, n_samples=60, c_day=c_day_mp5
     )
     diff_rep = MetrologicalReport(
         model_name="ICDC Diffusion (In-Context)",
@@ -147,18 +163,19 @@ def run_real_benchmark(
     )
 
     # Print Summary Table
-    print("\n" + "=" * 75)
-    print(f"{'Modelo':<28} | {'RMSEP':<8} | {'R²':<8} | {'Bias':<8} | {'PICP (95%)':<11} | {'MPIW':<8}")
-    print("-" * 75)
-    for rep in [pls_rep, cnn_rep, diff_rep]:
+    print("\n" + "=" * 78)
+    print(f"{'Modelo':<28} | {'RMSEP':<8} | {'R²':<8} | {'Bias':<8} | {'PICP (95%)':<11} | {'Pred Range':<14}")
+    print("-" * 78)
+    for rep, preds in [(pls_rep, y_pred_pls), (cnn_rep, y_pred_cnn), (diff_rep, y_pred_diff)]:
+        r_str = f"[{preds.min():.2f}, {preds.max():.2f}]"
         print(
             f"{rep.model_name:<28} | {rep.rmsep:<8.4f} | {rep.r2:<8.4f} | {rep.bias:<+8.4f} | "
-            f"{(rep.picp_95 * 100 if rep.picp_95 else 0.0):<10.1f}% | {rep.mpiw_95:<8.4f}"
+            f"{(rep.picp_95 * 100 if rep.picp_95 else 0.0):<10.1f}% | {r_str:<14}"
         )
-    print("=" * 75)
+    print("=" * 78)
 
-    # 4. Generate Diagnostic Figures
-    print("\n[4/4] Generating Real Benchmark Diagnostic Figures...")
+    # 5. Generate Diagnostic Figures
+    print("\n[5/5] Generating Real Benchmark Diagnostic Figures...")
     sns.set_theme(style="whitegrid", font="sans-serif")
 
     # Plot 1: Spectra Comparison M5 vs MP5
@@ -186,7 +203,7 @@ def run_real_benchmark(
 
     for title, y_p, low, up, color, ax in models_data:
         ax.plot([y_tgt_test.min() - 0.5, y_tgt_test.max() + 0.5],
-                [y_tgt_test.min() - 0.5, y_tgt_test.max() + 0.5], "k--", alpha=0.5, label="Ideal")
+                [y_tgt_test.min() - 0.5, y_tgt_test.max() + 0.5], "k--", alpha=0.5, label="Ideal (y=x)")
         y_err_low = np.maximum(0, y_p - low)
         y_err_up = np.maximum(0, up - y_p)
         ax.errorbar(

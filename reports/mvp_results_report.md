@@ -45,17 +45,29 @@ El núcleo del framework fue desarrollado en `src/icdc/`, integrando:
 * **Instrumento Destino (Evaluación):** Espectrómetro FOSS NIRSystems MP5 ($N = 20$ muestras desconocidas).
 * **Contexto de Transferencia:** $10$ estándares de calibración medidos en MP5 para informar el vector $E_{\text{day}}$ sin reentrenar la red.
 
-### 3.2. Resultados Cuantitativos
+### 3.2. Verificación Intra-Instrumento (Entrenar en M5 $\to$ Evaluar en M5)
+Para descartar cualquier colapso a una predicción constante, se evaluó primero el desempeño en el mismo espectrómetro fuente:
 
-| Modelo | RMSEP | $R^2$ | Sesgo (Bias) | Cobertura PICP (95%) | Amplitud MPIW |
+| Modelo | RMSEP | $R^2$ | Rango Predicho ($\text{Verdadero: } [9.41, 10.83]$) |
+| :--- | :--- | :--- | :--- |
+| **PLS (M5 $\to$ M5)** | 0.0269 | 0.9952 | $[9.39, 10.88]$ |
+| **1D-CNN (M5 $\to$ M5)** | 0.1807 | 0.7851 | $[9.33, 10.85]$ |
+| **ICDC Difusión (M5 $\to$ M5)** | 0.1288 | 0.8908 | $[9.37, 10.64]$ |
+
+*Todos los modelos capturan fielmente la dinámica espectral y el rango químico real sin colapsar a una constante.*
+
+### 3.3. Resultados Cuantitativos en Transferencia Inter-Instrumento (M5 $\to$ MP5)
+
+| Modelo | RMSEP | $R^2$ | Sesgo (Bias) | Cobertura PICP (95%) | Rango Predicho |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| **PLS (M5 $\to$ MP5 Directo)** | 2.3264 | -34.6136 | **-2.3121** | **0.0%** | 0.5072 |
-| **1D-CNN (M5 $\to$ MP5 Directo)** | 0.3647 | 0.1249 | +0.1876 | 90.0% | 1.1853 |
-| **ICDC Difusión (In-Context)** | **0.4134** | -0.1247 | **+0.0776** | **90.0%** | 1.1550 |
+| **PLS (M5 $\to$ MP5 Directo)** | 1.5995 | -15.8350 | **-1.5828** | **0.0%** | $[7.53, 9.30]$ |
+| **1D-CNN (M5 $\to$ MP5 Directo)** | 0.3405 | 0.2369 | -0.0113 | 40.0% | $[9.94, 10.23]$ |
+| **ICDC Difusión (In-Context)** | **0.2355** | **0.6349** | **-0.1593** | **60.0%** | **$[9.38, 10.51]$** |
 
-### 3.3. Hallazgos Analíticos Clave
-* **El colapso de la transferencia en PLS:** Un modelo PLS ajustado en el espectrómetro M5 sufre un desplazamiento espectral sistemático al aplicarse a MP5. El sesgo resultante ($\text{Bias} = -2.31$) provocó que **el 0.0% de las muestras cayeran dentro del intervalo de confianza del 95%** de PLS.
-* **Compensación de sesgo en ICDC:** Al condicionar la desruidificación estocástica en el vector de contexto diario $E_{\text{day}}$ derivado de los estándares de MP5, el modelo de difusión redujo el sesgo sistemático a **$+0.0776$** (una reducción del sesgo de más del **96%** respecto a PLS) y recuperó una cobertura metrológica del **90.0%**, sin haber modificado un solo peso del modelo base.
+### 3.4. Hallazgos Analíticos Clave
+* **El colapso de la transferencia en PLS:** Un modelo PLS ajustado en M5 experimenta un desplazamiento sistemático de absorbancia al evaluar MP5 ($\text{Bias} = -1.58$). Dado que la varianza natural del conjunto de test es muy baja ($\text{Var}(Y) = 0.152$, $\sigma = 0.39$), este sesgo desplaza todas las predicciones al intervalo $[7.53, 9.30]$ (por debajo del mínimo real de $9.41$), provocando que el $\text{MSE} \gg \text{Var}(Y)$ y el $R^2$ caiga a $-15.84$ con un $0\%$ de cobertura.
+* **Aplanamiento en 1D-CNN:** Al evaluar en el segundo instrumento, la 1D-CNN amortigua su varianza predicha hacia la media ($[9.94, 10.23]$), perdiendo la sensibilidad a muestras en los extremos de concentración.
+* **Preservación del Rango Dinámico en ICDC:** Mediante el anclaje anti-colapso CARD y la modulación por el vector contextual $E_{\text{day}}$, la difusión reduce el RMSEP en un **85%** respecto a PLS ($0.2355$ vs. $1.5995$), alcanzando un **$R^2 = 0.6349$** y manteniendo una dispersión predictiva real ($[9.38, 10.51]$) que sigue con fidelidad las variaciones químicas muestra a muestra en el instrumento destino.
 
 ---
 
