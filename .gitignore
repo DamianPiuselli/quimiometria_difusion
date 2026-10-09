@@ -43,6 +43,6 @@ ENV/
 *.h5
 *.parquet
 *.mat
-data/
-scratch/
+/data/
+/scratch/
 
