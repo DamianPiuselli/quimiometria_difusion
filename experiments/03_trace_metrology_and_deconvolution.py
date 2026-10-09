@@ -44,7 +44,7 @@ from icdc.metrology.detection_limits import (
 
 
 def run_experiment_03(
-    output_dir: str = "reports/figures",
+    output_dir: str = "reports/exp03_trace_metrology_and_deconvolution/figures",
     n_points: int = 128,
     random_state: int = 42,
 ):

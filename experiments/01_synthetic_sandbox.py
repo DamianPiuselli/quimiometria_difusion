@@ -32,7 +32,7 @@ def run_synthetic_sandbox(
     n_train: int = 250,
     n_test: int = 80,
     n_points: int = 128,
-    output_dir: str = "reports/figures",
+    output_dir: str = "reports/exp01_synthetic_sandbox/figures",
     random_state: int = 42,
 ):
     print("=" * 70)

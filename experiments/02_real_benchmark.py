@@ -33,7 +33,7 @@ from icdc.metrology.metrics import (
 def run_real_benchmark(
     n_train_source: int = 50,
     n_transfer_standards: int = 10,
-    output_dir: str = "reports/figures",
+    output_dir: str = "reports/exp02_corn_nir_transfer/figures",
     random_state: int = 42,
 ):
     print("=" * 75)
