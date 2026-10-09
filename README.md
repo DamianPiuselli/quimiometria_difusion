@@ -1,18 +1,22 @@
-# Calibración Contextual Basada en Modelos de Difusión para Química Analítica
-## Marco Teórico, Pipeline Metrológico y Aplicaciones en Quimiometría Avanzada
+# Modelos de Difusión para Quimiometría y Metrología Analítica Avanzada
+## Cuantificación de Incertidumbre en Trazas (LOD/LOQ) y Desconvolución Ciega de Interferentes
 
 ---
 
 ## 1. Resumen Ejecutivo y Motivación
 
-En la química analítica contemporánea y en los laboratorios de ensayo regulados (bajo normativas **ISO/IEC 17025**, directrices de la **FDA/EMA** y la **Farmacopea**), la cuantificación multivariante enfrenta dos realidades operativas ineludibles:
+En la química analítica contemporánea y en los laboratorios de ensayo regulados (bajo normativas **ISO/IEC 17025**, directrices de la **FDA/EMA**, **ISO 11843** y la **Farmacopea**), la cuantificación multivariante enfrenta dos desafíos fundamentales donde los modelos lineales clásicos (**PLS**, **PCR**) y las redes neuronales deterministas tocan un techo metodológico:
 
-1. **Deriva Instrumental Diaria (Day-to-day drift):** La respuesta analítica absoluta de un instrumento (HPLC-DAD, LC-MS/MS, GC-MS, NIR, ICP-MS) varía cada vez que se enciende el equipo debido a envejecimiento de lámparas, ensuciamiento de conos de ionización, deriva térmica, fluctuaciones de flujo y degradación de columnas cromatográficas. Esto exige secuencias diarias con blancos, curvas de calibración y muestras de control de calidad (QC).
-2. **Heterogeneidad de Matrices (Client-to-client matrix effects):** Las muestras remitidas por diferentes clientes o fuentes presentan variaciones severas en su composición de fondo (viscosidad, fuerza iónica, lípidos, interferentes coeluyentes), lo que altera las eficiencias de ionización, dispersión de luz y recuperaciones analíticas.
+1. **La Crisis Metrológica cerca del Límite de Cuantificación (LOD / LOQ):**
+   * En análisis de trazas (residuos de plaguicidas, impurezas mutagénicas o biomarcadores clínicos a nivel sub-ppm/ppb), la varianza analítica es marcadamente **heterocedástica** (Trompeta de Horwitz) y la verdadera distribución a posteriori del analito es asimétrica y estrictamente no negativa ($y \ge 0$).
+   * Los métodos lineales asumen errores residuales gaussianos homocedásticos ($\pm z_{\alpha} \cdot s_{y/x}$). Esto produce la aberración metrológica de **predecir intervalos de confianza con límites inferiores negativos** (asignando probabilidad a concentraciones físicas imposibles) e impide el cálculo riguroso del Límite de Decisión ($\text{CC}\alpha$) y la Capacidad de Detección ($\text{CC}\beta$).
+2. **El Fallo Silencioso ante Interferentes y Adulterantes No Modelados:**
+   * Cuando una muestra real contiene un interferente coeluyente o un adulterante no previsto en el conjunto de calibración, **PLS falla en silencio**: proyecta la absorbancia del interferente sobre el vector de regresión del analito, entregando un número puntual sesgado con una falsa apariencia de certeza.
 
-Los modelos tradicionales de quimiometría (como **PLS**, **PCR** o **MCR-ALS**) asumen relaciones rígidas, estacionariedad o linealidad aproximada, y cuando fallan ante un interferente, lo hacen **en silencio**, sesgando el resultado sin alertar al analista. Por su parte, las redes neuronales deterministas (CNNs, MLPs) entregan estimaciones puntuales desprovistas de incertidumbre metrológica y sufren de sobreajuste catastrófico ante matrices no vistas.
-
-Este documento formaliza el marco teórico de **Calibración Contextual por Difusión (In-Context Diffusion Calibration - ICDC)**: un pipeline generativo que no busca reemplazar la secuencia analítica diaria, sino orquestarla para proporcionar **cuantificación adaptativa, detección automática de interferencias y evaluación no paramétrica de la incertidumbre metrológica según la GUM** (*Guide to the Expression of Uncertainty in Measurement*).
+Este proyecto formaliza y desarrolla el marco de **Quimiometría Generativa Basada en Difusión**:
+* **En metrología de trazas:** Genera la función de densidad de probabilidad continua empírica $p(y \mid X)$, garantizando **estricta positividad física ($y \ge 0$)**, heterocedasticidad adaptativa y evaluación de riesgos $\alpha/\beta$ conforme a la **GUM**.
+* **En matrices complejas:** Utiliza el modelo de difusión como un *prior generativo* para **Desconvolución Ciega mediante Diffusion Posterior Sampling (DPS)**, aislando interferentes no modelados sin requerir reentrenamiento y alertando al analista mediante la expansión metrológica del intervalo de credibilidad.
+* **Preprocesamiento Quimiométrico Riguroso:** Integra de forma nativa derivadas y filtros de **Savitzky-Golay** para establecer comparaciones justas y reproducibles frente a las mejores prácticas de la disciplina.
 
 ---
 
