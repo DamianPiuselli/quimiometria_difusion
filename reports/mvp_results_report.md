@@ -26,14 +26,14 @@ El núcleo del framework fue desarrollado en `src/icdc/`, integrando:
 
 | Modelo | RMSEP | $R^2$ | Cobertura PICP (95%) | Amplitud MPIW | Predicciones Válidas ($y_{\text{low}} \ge 0$) |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| **PLS Baseline** | 2.1974 | 0.1271 | 92.5% | 7.9290 | **0.0%** (falla total cerca de LOD) |
-| **1D-CNN Baseline** | 0.1452 | 0.9962 | 92.5% | 0.4620 | **51.2%** (la mitad con $y < 0$) |
+| **PLS Baseline** | 0.1612 | 0.9953 | 91.2% | 0.3843 | **63.7%** (36.3% con $y_{\text{low}} < 0$) |
+| **1D-CNN Baseline** | 0.1452 | 0.9962 | 92.5% | 0.4620 | **51.2%** (48.8% con $y_{\text{low}} < 0$) |
 | **ICDC Difusión** | 0.2912 | 0.9847 | 83.8% | 0.7465 | **100.0%** (estricto $y \ge 0$) |
 
 ### 2.3. Hallazgos Analíticos Clave
-* **Colapso metrológico de PLS:** Ante la presencia de picos asimétricos con colas (EMG) y derivas de línea de base no lineales, el residuo cuadrático de PLS se infló ($s_{y/x}$ alto), generando intervalos de incertidumbre simétricos gigantescos ($\text{MPIW} = 7.93$). Como consecuencia, **el 100% de los intervalos de confianza predichos por PLS arrojaron límites inferiores negativos**, lo cual es físicamente inadmisible en química analítica.
-* **Falsa certeza y negatividad en 1D-CNN:** Aunque la 1D-CNN determinista alcanzó un $R^2$ alto, su intervalo gaussiano homocedástico produjo límites inferiores negativos en el **48.8% de las muestras de test**, fallando en concentraciones de trazas.
-* **Fidelidad física en ICDC:** El modelo de difusión aprendió la frontera natural no lineal de concentración, manteniendo el **100% de sus predicciones en el dominio físicamente permitido ($y \ge 0$)** y modulando el ancho del intervalo según el nivel de concentración (heterocedasticidad real).
+* **Comportamiento puntual de PLS vs. Aprendizaje Profundo:** Cuando se utiliza sin SNV (el cual destruye la señal cromatográfica al normalizar por la desviación estándar del propio pico analítico), PLS demuestra su potencia clásica en ajuste lineal, alcanzando un excelente $R^2 = 0.9953$, comparable al $R^2 = 0.9962$ de la 1D-CNN.
+* **El fallo metrológico de los modelos lineales y deterministas cerca del LOD:** Tanto PLS como la 1D-CNN asumen residuos homocedásticos gaussianos simétricos ($\pm z_{\alpha} \cdot s$). En consecuencia, para muestras en niveles de traza cercanas al límite de detección, el límite inferior del intervalo de confianza predicho es negativo en el **36.3% de las muestras en PLS** y en el **48.8% en la 1D-CNN**.
+* **Fidelidad física en ICDC:** El modelo de difusión aprende la frontera natural no lineal de concentración, manteniendo el **100% de sus predicciones en el dominio físicamente permitido ($y \ge 0$)** y modulando el ancho del intervalo según el nivel de concentración (heterocedasticidad real de Horwitz).
 
 ---
 

@@ -66,9 +66,9 @@ def run_synthetic_sandbox(
     # 2. Train Models
     print("\n[2/4] Training Baseline Models & Diffusion Regressor...")
 
-    # A. PLS
-    print("  --> Fitting PLS Baseline (with cross-validation)...")
-    pls = PLSBaseline(max_components=10, use_snv=True, random_state=random_state)
+    # A. PLS (sin SNV en cromatografía para no normalizar el área del pico)
+    print("  --> Fitting PLS Baseline (use_snv=False for chromatography)...")
+    pls = PLSBaseline(max_components=10, use_snv=False, random_state=random_state)
     pls.fit(x_train, y_train)
     print(f"      Selected Latent Variables (LV): {pls.best_n_components}")
 
