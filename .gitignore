@@ -42,5 +42,6 @@ ENV/
 *.ckpt
 *.h5
 *.parquet
-data/raw/
-data/processed/
+*.mat
+data/
+
