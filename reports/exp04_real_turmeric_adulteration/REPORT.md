@@ -1,5 +1,5 @@
 # Reporte de Experimento 04: Benchmark Real de Adulteración Tóxica en Cúrcuma
-## Cuantificación en Trazas (LOD/LOQ) y Desconvolución Ciega (DPS) en Espectros FT-Raman Reales
+## Cuantificación en Trazas (LOD/LOQ), Trompeta de Horwitz y Desconvolución Ciega (DPS) en Espectros FT-Raman Reales
 
 ---
 
@@ -73,33 +73,43 @@ Al someter una muestra adulterada desconocida al $5\%$ a desconvolución ciega g
 
 ---
 
-## 4. Figuras Diagnósticas
+## 4. Galería Diagnóstica de Figuras
 
-### Figura 1: Exploración Espectral FT-Raman Real
-Variabilidad de matriz en 15 lotes auténticos, dilución escalonada de $PbCrO_4$ ($0\%$ a $10\%$) y zoom en la banda de cromato a $840\ \text{cm}^{-1}$:
+### Figura 1: Espectros Crudos, Preprocesamiento y Banda Diagnóstica
+Espectros crudos de la serie de dilución ($0\%$ a $10\%$), derivada primera de Savitzky-Golay eliminando fluorescencia, y zoom diagnóstico en la banda $\nu_1(\text{CrO}_4^{2-}) \approx 840\ \text{cm}^{-1}$ comparado con el patrón $100\%$ puro:
 
-![EDA FT-Raman](figures/01_curcuma_ftraman_eda.png)
+![EDA y Savitzky-Golay](figures/01_curcuma_ftraman_eda.png)
 
-### Figura 2: Auditoría Metrológica — PLS vs. Difusión en Trazas
-Predicciones con barras de incertidumbre al 95%, demostración de la excursión negativa de PLS ($57.1\%$) y comparación de amplitudes de intervalo:
+### Figura 2: Distribución de Señal cerca de Cero ($C \to 0$) y Solapamiento de Matriz
+Boxplots de intensidades en $839.8\ \text{cm}^{-1}$, zoom extremo en la densidad empírica de blancos ($0\%$) vs. trazas ($0.1\%$) demostrando cómo la dispersión natural de la matriz ahoga la señal neta a niveles bajos, y curva de calibración univariada:
 
-![Metrología PLS vs Difusión](figures/02_metrologia_trazas_pls_vs_difusion.png)
+![Comportamiento Cerca de Cero](figures/02_distribucion_senales_cero.png)
 
-### Figura 3: Triaje de Matriz OOD por Norma de Score
+### Figura 3: Auditoría Metrológica — PLS vs. Difusión en Trazas
+Predicciones con barras de incertidumbre al 95%, demostración de la excursión negativa de PLS ($57.1\%$ de las muestras violando la física) y comparación de amplitudes de intervalo:
+
+![Metrología PLS vs Difusión](figures/03_metrologia_trazas_pls_vs_difusion.png)
+
+### Figura 4: Límites de Decisión ISO 11843 y Trompeta de Horwitz
+Densidad de predicción sobre blancos ($C=0$) y cortes $\text{CC}\alpha$, curva de la Trompeta de Horwitz teórica ($\text{RSD}\% = 2^{(1 - 0.5 \log_{10} C)}$) contrastada con la dispersión empírica, y heterocedasticidad adaptativa de la difusión vs. homocedasticidad rígida de PLS:
+
+![LOD/LOQ y Trompeta de Horwitz](figures/04_lod_loq_trompeta_horwitz.png)
+
+### Figura 5: Triaje de Matriz OOD por Norma de Score
 Distribución de la norma de score por nivel de adulteración y curva ROC de detección zero-shot:
 
-![Triaje OOD](figures/03_triaje_ood_score_norm.png)
+![Triaje OOD](figures/05_triaje_ood_score_norm.png)
 
-### Figura 4: Desconvolución Ciega DPS y Cotejo con Patrón Puro
+### Figura 6: Desconvolución Ciega DPS y Cotejo con Patrón Puro
 Reconstrucción de cúrcuma limpia y firma del adulterante aislado por DPS contrastado contra el patrón físico de $100\%$ $PbCrO_4$ ($r = 0.805$):
 
-![Desconvolución DPS](figures/04_desconvolucion_ciega_dps_vs_patron.png)
+![Desconvolución DPS](figures/06_desconvolucion_ciega_dps_vs_patron.png)
 
 ---
 
 ## 5. Cuaderno Práctico para Docencia y Transferencia
 
-Todo el análisis, las deducciones teóricas y los gráficos ejecutables están documentados en el Jupyter Notebook:
+Todo el análisis, las deducciones teóricas y los gráficos ejecutables están documentados y pre-renderizados en:
 
 ```bash
 notebooks/04_estudio_real_adulteracion_curcuma_difusion.ipynb
